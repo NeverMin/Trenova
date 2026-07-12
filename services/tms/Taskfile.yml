@@ -39,8 +39,17 @@ tasks:
 
   run-watch:
     desc: Run the API server with hot reload
+    deps: [build-cli]
     cmds:
-      - air api run
+      - |
+        if command -v air >/dev/null 2>&1; then
+          air api run
+        elif [ -x "$(go env GOPATH)/bin/air" ]; then
+          "$(go env GOPATH)/bin/air" api run
+        else
+          echo "air not found; falling back to the compiled API server without hot reload" >&2
+          "{{.CLI_PATH}}" api run
+        fi
 
   run-worker:
     desc: Run the worker service
@@ -371,8 +380,17 @@ tasks:
 
   watch:
     desc: Run API with hot reload
+    deps: [build-cli]
     cmds:
-      - air api run
+      - |
+        if command -v air >/dev/null 2>&1; then
+          air api run
+        elif [ -x "$(go env GOPATH)/bin/air" ]; then
+          "$(go env GOPATH)/bin/air" api run
+        else
+          echo "air not found; falling back to the compiled API server without hot reload" >&2
+          "{{.CLI_PATH}}" api run
+        fi
 
   watch-ui:
     desc: Run frontend with hot reload
