@@ -226,6 +226,10 @@ describe("Cloudflare SPA worker", () => {
     expect(forwardedRequest.url).toBe("http://192.168.1.176:8080/api/v1/auth/login?next=%2Fshipments");
     expect(forwardedRequest.method).toBe("POST");
     expect(forwardedRequest.headers.get("X-CSRF-Token")).toBe("dev-csrf-token");
+    expect(forwardedRequest.headers.get("Origin")).toBe("http://localhost:5173");
+    expect(forwardedRequest.headers.get("Referer")).toBe(
+      "http://localhost:5173/api/v1/auth/login?next=%2Fshipments",
+    );
   });
 
   it("returns 404 for missing file-like paths instead of SPA HTML", async () => {

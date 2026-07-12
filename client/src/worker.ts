@@ -176,6 +176,7 @@ async function fetchLocalDevelopmentAPI(request: Request): Promise<Response> {
 
   const headers = new Headers(request.headers);
   headers.delete("Host");
+  normalizeLocalDevelopmentProxyHeaders(headers, request);
 
   const hasBody = request.method !== "GET" && request.method !== "HEAD";
 
@@ -222,6 +223,19 @@ function localDevelopmentRelativeAPIURL(requestURL: URL, configuredURL: string):
   targetURL.hash = "";
 
   return targetURL;
+}
+
+function normalizeLocalDevelopmentProxyHeaders(headers: Headers, request: Request): void {
+  const requestURL = new URL(request.url);
+  const localFrontendOrigin = `${requestURL.protocol}//localhost:${requestURL.port || "5173"}`;
+
+  if (headers.has("Origin")) {
+    headers.set("Origin", localFrontendOrigin);
+  }
+
+  if (headers.has("Referer")) {
+    headers.set("Referer", `${localFrontendOrigin}${requestURL.pathname}${requestURL.search}`);
+  }
 }
 
 function isFileLikePath(pathname: string): boolean {
