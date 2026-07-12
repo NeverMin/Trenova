@@ -5,7 +5,6 @@ import type { TenantLoginMetadata, UserOrganization } from "@/types/organization
 import type { UseQueryResult } from "@tanstack/react-query";
 import { AnimatePresence, m } from "motion/react";
 import { useState } from "react";
-import { Link } from "react-router";
 import { LoginForm } from "./login-form";
 import { OrganizationSelection } from "./organization-selection";
 
@@ -76,7 +75,7 @@ export function AuthForm({
     ? "Choose the workspace for this session."
     : tenantMetadata
       ? `Sign in to ${tenantMetadata.organizationName}`
-      : "Don't have an account yet?";
+      : "Sign in with your workspace account.";
 
   const handleOrganizationSelectionRequired = (organizations: UserOrganization[]) => {
     setSelectableOrganizations(organizations);
@@ -97,13 +96,11 @@ export function AuthForm({
               transition={{ duration: 0.2, ease: "easeOut" }}
             >
               <CardTitle>{title}</CardTitle>
-              <CardDescription className="mt-1 flex space-x-1 text-sm">
-                <span className="text-muted-foreground">{subtitle}</span>
-                {!tenantMetadata && !isOrganizationStep && (
-                  <Link className="text-primary underline" to="#">
-                    Create an Account
-                  </Link>
-                )}
+              <CardDescription className="mt-1 text-sm text-muted-foreground">
+                {subtitle}
+                {!tenantMetadata && !isOrganizationStep
+                  ? " Contact your administrator if you need an account."
+                  : null}
               </CardDescription>
             </m.div>
           </CardHeader>

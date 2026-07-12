@@ -195,8 +195,9 @@ function localDevelopmentAPIURL(request: Request): URL | null {
     return null;
   }
 
+  const requestURL = new URL(request.url);
+
   try {
-    const requestURL = new URL(request.url);
     const apiURL = new URL(configuredURL);
     apiURL.pathname = requestURL.pathname;
     apiURL.search = requestURL.search;
@@ -204,8 +205,23 @@ function localDevelopmentAPIURL(request: Request): URL | null {
 
     return apiURL;
   } catch {
+    return localDevelopmentRelativeAPIURL(requestURL, configuredURL);
+  }
+}
+
+function localDevelopmentRelativeAPIURL(requestURL: URL, configuredURL: string): URL | null {
+  if (!configuredURL.startsWith("/")) {
     return null;
   }
+
+  const targetURL = new URL(requestURL.toString());
+  targetURL.protocol = "http:";
+  targetURL.port = "8080";
+  targetURL.pathname = requestURL.pathname;
+  targetURL.search = requestURL.search;
+  targetURL.hash = "";
+
+  return targetURL;
 }
 
 function isFileLikePath(pathname: string): boolean {
@@ -278,11 +294,55 @@ function contentSecurityPolicy(request: Request | null): string {
     `connect-src ${effectiveConnectSources.join(" ")}`,
     "worker-src 'self' blob:",
     "manifest-src 'self'",
-    "upgrade-insecure-requests",
+    ...(isLocalDevelopment ? [] : ["upgrade-insecure-requests"]),
   ].join("; ");
 }
 
 function isLocalDevelopmentRequest(request: Request): boolean {
   const hostname = new URL(request.url).hostname.toLowerCase();
-  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+  return isLocalDevelopmentHostname(hostname);
+}
+
+function isLocalDevelopmentHostname(hostname: string): boolean {
+  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]") {
+    return true;
+  }
+
+  if (hostname.endsWith(".local")) {
+    return true;
+  }
+
+  return isPrivateIPv4(hostname);
+}
+
+function isPrivateIPv4(hostname: string): boolean {
+  const octets = hostname.split(".");
+  if (octets.length !== 4) {
+    return false;
+  }
+
+  const numbers = octets.map((octet) => Number.parseInt(octet, 10));
+  if (numbers.some((part) => Number.isNaN(part) || part < 0 || part > 255)) {
+    return false;
+  }
+
+  const [first, second] = numbers;
+
+  if (first === 10 || first === 127) {
+    return true;
+  }
+
+  if (first === 192 && second === 168) {
+    return true;
+  }
+
+  if (first === 172 && second >= 16 && second <= 31) {
+    return true;
+  }
+
+  if (first === 169 && second === 254) {
+    return true;
+  }
+
+  return false;
 }

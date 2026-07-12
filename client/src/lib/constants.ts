@@ -1,15 +1,41 @@
 function resolveApiBaseUrl(): string {
   const configuredUrl = (import.meta.env.VITE_API_URL as string) || "/api/v1";
 
-  if (
-    import.meta.env.DEV &&
-    typeof window !== "undefined" &&
-    configuredUrl.startsWith("http://localhost:8080/")
-  ) {
-    return "/api/v1";
+  if (typeof window !== "undefined") {
+    const localApiPath = resolveLocalApiPath(configuredUrl);
+    if (localApiPath) {
+      return localApiPath;
+    }
   }
 
   return configuredUrl;
+}
+
+function resolveLocalApiPath(configuredUrl: string): string | null {
+  try {
+    const url = new URL(configuredUrl);
+    if (!isLocalApiHostname(url.hostname)) {
+      return null;
+    }
+
+    const path = normalizeLocalApiPath(url.pathname);
+    return `${path}${url.search}`;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeLocalApiPath(pathname: string): string {
+  if (!pathname || pathname === "/") {
+    return "/api/v1";
+  }
+
+  return pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+}
+
+function isLocalApiHostname(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "[::1]";
 }
 
 export const API_BASE_URL = resolveApiBaseUrl();

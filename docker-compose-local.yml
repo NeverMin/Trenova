@@ -10,6 +10,7 @@ services:
             POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
             POSTGRES_USER: ${DB_USER:-postgres}
             POSTGRES_DB: ${DB_NAME:-trenova_go_db}
+            PGDATA: /var/lib/postgresql/data
             POSTGRES_INITDB_ARGS: "--data-checksums"
             POSTGRES_MULTIPLE_EXTENSIONS: "pg_stat_statements,pg_trgm,btree_gin,btree_gist,postgis,pg_cron"
         volumes:

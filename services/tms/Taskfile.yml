@@ -126,6 +126,34 @@ tasks:
     cmds:
       - go mod download
 
+  config-init:
+    desc: Initialize local config from example when missing
+    cmds:
+      - |
+        if [ -f config/config.yaml ]; then
+          echo "config/config.yaml already exists"
+        else
+          cp config/config.example.yaml config/config.yaml
+          echo "Created config/config.yaml from config/config.example.yaml"
+        fi
+
+  config-check:
+    desc: Detect known legacy config keys that are incompatible with the current schema
+    deps: [config-init]
+    cmds:
+      - |
+        if grep -q '^samsara:' config/config.yaml; then
+          echo "config/config.yaml contains legacy top-level key 'samsara' which is no longer supported"
+          echo "Refresh the file from config/config.example.yaml and reapply local overrides"
+          exit 1
+        fi
+
+        if grep -q '^  maxAge:' config/config.yaml; then
+          echo "config/config.yaml contains legacy server.maxAge; move it under server.cors.maxAge"
+          echo "Refresh the file from config/config.example.yaml and reapply local overrides"
+          exit 1
+        fi
+
   update:
     desc: Update dependencies
     cmds:
@@ -202,7 +230,8 @@ tasks:
   docker-up:
     desc: Start all services with docker compose
     cmds:
-      - "{{.DOCKER_COMPOSE_LOCAL}} up -d"
+      - "{{.DOCKER_COMPOSE_LOCAL}} up -d --wait db redis minio meilisearch"
+      - "{{.DOCKER_COMPOSE_LOCAL}} up -d redis-insight"
 
   docker-down:
     desc: Stop all services
@@ -264,7 +293,7 @@ tasks:
 
   db-setup:
     desc: Setup database (migrate + seed)
-    deps: [generate-seeds, build-cli]
+    deps: [generate-seeds, build-cli, docker-up]
     cmds:
       - |
         if [ -n "{{.env}}" ]; then
@@ -352,7 +381,7 @@ tasks:
 
   dev:
     desc: Start development environment
-    deps: [docker-up]
+    deps: [config-check, docker-up]
     cmds:
       - task --parallel watch watch-ui
 
@@ -423,7 +452,7 @@ tasks:
     cmds:
       - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
       - go install github.com/securego/gosec/v2/cmd/gosec@latest
-      - go install github.com/cosmtrek/air@latest
+      - go install github.com/air-verse/air@latest
       - go install github.com/sonatype-nexus-community/nancy@latest
 
   kafka-reset:
@@ -442,7 +471,7 @@ tasks:
 
   quick-start:
     desc: Quick start for new developers
-    deps: [deps, tools, docker-up, db-setup]
+    deps: [config-check, deps, tools, docker-up, db-setup]
     cmds:
       - 'echo "Quick start complete"'
       - 'echo "To start the development server, run: task dev"'

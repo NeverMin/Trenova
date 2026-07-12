@@ -49,6 +49,25 @@ describe("Cloudflare SPA worker", () => {
     expect(response.headers.get("Content-Security-Policy")).toContain("http://127.0.0.1:8080");
     expect(response.headers.get("Content-Security-Policy")).toContain("http://localhost:9000");
     expect(response.headers.get("Content-Security-Policy")).toContain("http://127.0.0.1:9000");
+    expect(response.headers.get("Content-Security-Policy")).not.toContain(
+      "upgrade-insecure-requests",
+    );
+  });
+
+  it("treats private LAN addresses as local development", async () => {
+    const env = createAssetEnv();
+    const request = new Request("http://192.168.1.176:5173/shipments", {
+      headers: { Accept: "text/html" },
+    });
+
+    const response = await worker.fetch(request, env);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Strict-Transport-Security")).toBeNull();
+    expect(response.headers.get("Content-Security-Policy")).toContain("'unsafe-inline'");
+    expect(response.headers.get("Content-Security-Policy")).not.toContain(
+      "upgrade-insecure-requests",
+    );
   });
 
   it("returns 404 for sensitive paths before static asset lookup", async () => {
@@ -171,20 +190,42 @@ describe("Cloudflare SPA worker", () => {
     expect(await forwardedRequest.text()).toBe(JSON.stringify({ query: "query Test { ok }" }));
   });
 
-  it("returns 404 for local API paths when VITE_API_URL is not absolute", async () => {
+  it("passes API paths through to the current host backend when VITE_API_URL is relative", async () => {
     const env = createAssetEnv();
     vi.stubEnv("VITE_API_URL", "/api/v1");
 
+    const fetchMock = vi.fn(async (_request: Request) => {
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
     const response = await worker.fetch(
-      new Request("http://127.0.0.1:5174/api/v1/auth/login", {
+      new Request("http://192.168.1.176:5173/api/v1/auth/login?next=%2Fshipments", {
+        body: JSON.stringify({ emailAddress: "test@example.com", password: "password" }),
         method: "POST",
-        headers: { Accept: "application/json" },
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-CSRF-Token": "dev-csrf-token",
+        },
       }),
       env,
     );
 
-    expect(response.status).toBe(404);
-    expect(env.ASSETS.fetch).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const forwardedRequest = fetchMock.mock.calls[0]?.[0];
+    expect(forwardedRequest).toBeDefined();
+    if (!forwardedRequest) {
+      throw new Error("expected forwarded API request");
+    }
+
+    expect(forwardedRequest.url).toBe("http://192.168.1.176:8080/api/v1/auth/login?next=%2Fshipments");
+    expect(forwardedRequest.method).toBe("POST");
+    expect(forwardedRequest.headers.get("X-CSRF-Token")).toBe("dev-csrf-token");
   });
 
   it("returns 404 for missing file-like paths instead of SPA HTML", async () => {
